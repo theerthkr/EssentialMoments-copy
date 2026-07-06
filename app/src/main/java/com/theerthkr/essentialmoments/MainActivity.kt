@@ -195,6 +195,15 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                             DropdownMenuItem(
+                                text = { Text("Storage Cleaner") },
+                                onClick = {
+                                    showMenu = false
+                                    val intent = Intent(context, CleanerActivity::class.java)
+                                    context.startActivity(intent)
+                                    (context as? Activity)?.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN, 0, 0)
+                                }
+                            )
+                            DropdownMenuItem(
                                 text = { Text("About") },
                                 onClick = { showMenu = false }
                             )
