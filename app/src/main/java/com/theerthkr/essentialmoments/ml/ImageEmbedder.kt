@@ -95,16 +95,16 @@ class ImageEmbedder(
         val m  = model         ?: run { Log.e(TAG, "Not initialized"); return null }
         val ib = inputBuffers  ?: return null
         val ob = outputBuffers ?: return null
-        val buf = preprocessor.preprocess(uri, debug) ?: return null
-        return runInference(m, ib, ob, bufferToFloat32(buf), debug)
+        val arr = preprocessor.preprocess(uri, debug) ?: return null
+        return runInference(m, ib, ob, arr, debug)
     }
 
     fun embed(bitmap: Bitmap, debug: Boolean = false): FloatArray? {
         val m  = model         ?: run { Log.e(TAG, "Not initialized"); return null }
         val ib = inputBuffers  ?: return null
         val ob = outputBuffers ?: return null
-        val buf = preprocessor.preprocessBitmap(bitmap, debug)
-        return runInference(m, ib, ob, bufferToFloat32(buf), debug)
+        val arr = preprocessor.preprocessBitmap(bitmap, debug)
+        return runInference(m, ib, ob, arr, debug)
     }
 
     // ── Inference — uses pre-allocated buffers ─────────────────────
@@ -133,11 +133,6 @@ class ImageEmbedder(
         normed
     } catch (e: Exception) {
         Log.e(TAG, "Inference failed: ${e.message}", e); null
-    }
-
-    private fun bufferToFloat32(buf: java.nio.ByteBuffer): FloatArray {
-        buf.rewind()
-        return FloatArray(buf.capacity() / 2) { preprocessor.f16ToF32(buf.short) }
     }
 
     // ── Math ──────────────────────────────────────────────────────
