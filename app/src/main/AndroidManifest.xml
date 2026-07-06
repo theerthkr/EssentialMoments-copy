@@ -47,7 +47,7 @@
 
         <activity
             android:name=".AlbumDetailActivity"
-            android:exported="true"
+            android:exported="false"
             android:label="@string/title_activity_album_detail"
             android:theme="@style/Theme.EssentialMoments" />
 
