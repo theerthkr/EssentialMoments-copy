@@ -123,15 +123,14 @@ class EmbeddingStore(context: Context) {
 
         val results = mutableListOf<SearchResult>()
         val raw = ByteArray(BYTES_PER_EMBEDDING)
+        val fb = ByteBuffer.wrap(raw)
+            .order(ByteOrder.LITTLE_ENDIAN)
+            .asFloatBuffer()
 
         RandomAccessFile(binFile, "r").use { raf ->
             for ((imageId, offset) in index) {
                 raf.seek(offset)
                 raf.readFully(raw)
-
-                val fb = ByteBuffer.wrap(raw)
-                    .order(ByteOrder.LITTLE_ENDIAN)
-                    .asFloatBuffer()
 
                 // Dot product of two unit vectors = cosine similarity
                 var score = 0f
