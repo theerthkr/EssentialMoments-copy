@@ -1,6 +1,7 @@
 package com.theerthkr.essentialmoments
 
 import android.app.Activity
+import androidx.activity.compose.LocalActivity
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -54,7 +55,8 @@ class SearchActivity : ComponentActivity() {
 
 @Composable
 fun SearchScreen(searchViewModel: SearchViewModel = viewModel()) {
-    val context        = LocalContext.current as Activity
+    val context        = LocalContext.current
+    val activity       = LocalActivity.current
     val focusRequester = remember { FocusRequester() }
 
     // Collect state
@@ -79,7 +81,7 @@ fun SearchScreen(searchViewModel: SearchViewModel = viewModel()) {
                 .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = { context.finish() }) {
+            IconButton(onClick = { activity?.finish() }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
 
