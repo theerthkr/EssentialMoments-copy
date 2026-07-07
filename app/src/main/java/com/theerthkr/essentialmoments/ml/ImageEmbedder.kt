@@ -142,11 +142,6 @@ class ImageEmbedder(
         Log.e(TAG, "Inference failed: ${e.message}", e); null
     }
 
-    private fun bufferToFloat32(buf: java.nio.ByteBuffer): FloatArray {
-        buf.rewind()
-        return FloatArray(buf.capacity() / 2) { preprocessor.f16ToF32(buf.short) }
-    }
-
     fun cosineSimilarity(a: FloatArray, b: FloatArray): Float {
         var s = 0f; for (i in a.indices) s += a[i] * b[i]; return s
     }
