@@ -96,7 +96,7 @@ class ImageEmbedder(
         val ib = inputBuffers  ?: return null
         val ob = outputBuffers ?: return null
         val buf = preprocessor.preprocess(uri, debug) ?: return null
-        return runInference(m, ib, ob, bufferToFloat32(buf), debug)
+        return runInference(m, ib, ob, buf, debug)
     }
 
     fun embed(bitmap: Bitmap, debug: Boolean = false): FloatArray? {
@@ -104,7 +104,7 @@ class ImageEmbedder(
         val ib = inputBuffers  ?: return null
         val ob = outputBuffers ?: return null
         val buf = preprocessor.preprocessBitmap(bitmap, debug)
-        return runInference(m, ib, ob, bufferToFloat32(buf), debug)
+        return runInference(m, ib, ob, buf, debug)
     }
 
     // ── Inference — uses pre-allocated buffers ─────────────────────
@@ -133,11 +133,6 @@ class ImageEmbedder(
         normed
     } catch (e: Exception) {
         Log.e(TAG, "Inference failed: ${e.message}", e); null
-    }
-
-    private fun bufferToFloat32(buf: java.nio.ByteBuffer): FloatArray {
-        buf.rewind()
-        return FloatArray(buf.capacity() / 2) { preprocessor.f16ToF32(buf.short) }
     }
 
     // ── Math ──────────────────────────────────────────────────────
