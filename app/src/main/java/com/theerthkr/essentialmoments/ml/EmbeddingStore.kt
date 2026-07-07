@@ -192,12 +192,7 @@ class EmbeddingStore(context: Context) {
             results.add(SearchResult(imageId, score))
         }
 
-        val results = mutableListOf<SearchResult>()
-        while (pq.isNotEmpty()) {
-            pq.poll()?.let { results.add(it) }
-        }
-        results.reverse()
-        return results
+        return results.sortedByDescending { it.score }.take(topK)
     }
 
     // ── Utility ───────────────────────────────────────────────────
