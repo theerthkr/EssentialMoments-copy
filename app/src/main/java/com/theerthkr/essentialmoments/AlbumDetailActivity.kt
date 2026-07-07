@@ -43,7 +43,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
+
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -59,6 +59,12 @@ class AlbumDetailActivity : ComponentActivity() {
         // Pull the "extras" from the intent
         val albumId = intent.getStringExtra("ALBUM_ID") ?: ""
         val albumName = intent.getStringExtra("ALBUM_NAME") ?: "Photos"
+
+        // Validate intent extras
+        if (albumId.isBlank() || albumId.length > 255 || albumName.length > 255) {
+            finish()
+            return
+        }
 
         setContent {
 
@@ -186,7 +192,6 @@ class AlbumDetailActivity : ComponentActivity() {
                         imageVector = Icons.Default.Search,
                         contentDescription = "Search",
                         tint = Color.White,
-
 
                         )
 

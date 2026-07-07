@@ -121,41 +121,27 @@ class EmbeddingStore(context: Context) {
         }
         if (index.isEmpty()) return emptyList()
 
-        // Min-heap to keep the topK results. Smallest score is at the top.
-        val pq = java.util.PriorityQueue<SearchResult>(topK + 1) { a, b ->
-            a.score.compareTo(b.score)
-        }
+        val results = mutableListOf<SearchResult>()
         val raw = ByteArray(BYTES_PER_EMBEDDING)
-        val fb = ByteBuffer.wrap(raw)
-            .order(ByteOrder.LITTLE_ENDIAN)
-            .asFloatBuffer()
-
-        val fb = ByteBuffer.wrap(raw)
-            .order(ByteOrder.LITTLE_ENDIAN)
-            .asFloatBuffer()
 
         RandomAccessFile(binFile, "r").use { raf ->
             for ((imageId, offset) in index) {
                 raf.seek(offset)
                 raf.readFully(raw)
 
+                val fb = ByteBuffer.wrap(raw)
+                    .order(ByteOrder.LITTLE_ENDIAN)
+                    .asFloatBuffer()
+
                 // Dot product of two unit vectors = cosine similarity
                 var score = 0f
                 for (i in 0 until DIM) score += queryEmbedding[i] * fb.get(i)
 
-                pq.offer(SearchResult(imageId, score))
-                if (pq.size > topK) {
-                    pq.poll()
-                }
+                results.add(SearchResult(imageId, score))
             }
         }
 
-        val results = mutableListOf<SearchResult>()
-        while (pq.isNotEmpty()) {
-            pq.poll()?.let { results.add(it) }
-        }
-        results.reverse()
-        return results
+        return results.sortedByDescending { it.score }.take(topK)
     }
 
     // ── Utility ───────────────────────────────────────────────────
