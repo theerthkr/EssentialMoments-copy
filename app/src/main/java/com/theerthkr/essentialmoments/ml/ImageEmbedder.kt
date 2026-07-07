@@ -37,6 +37,13 @@ class ImageEmbedder(
             ContentUris.withAppendedId(
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI, imageId
             )
+
+        // ── Math ──────────────────────────────────────────────────────
+        fun l2Norm(v: FloatArray) = sqrt(v.fold(0f) { a, x -> a + x * x })
+        fun l2Normalize(v: FloatArray): FloatArray {
+            val n = l2Norm(v)
+            return if (n < 1e-8f) v.copyOf() else FloatArray(v.size) { v[it] / n }
+        }
     }
 
     private var model: CompiledModel? = null
@@ -135,13 +142,11 @@ class ImageEmbedder(
         Log.e(TAG, "Inference failed: ${e.message}", e); null
     }
 
-    // ── Math ──────────────────────────────────────────────────────
-
-    fun l2Norm(v: FloatArray) = sqrt(v.fold(0f) { a, x -> a + x * x })
-    fun l2Normalize(v: FloatArray): FloatArray {
-        val n = l2Norm(v)
-        return if (n < 1e-8f) v.copyOf() else FloatArray(v.size) { v[it] / n }
+    private fun bufferToFloat32(buf: java.nio.ByteBuffer): FloatArray {
+        buf.rewind()
+        return FloatArray(buf.capacity() / 2) { preprocessor.f16ToF32(buf.short) }
     }
+
     fun cosineSimilarity(a: FloatArray, b: FloatArray): Float {
         var s = 0f; for (i in a.indices) s += a[i] * b[i]; return s
     }
