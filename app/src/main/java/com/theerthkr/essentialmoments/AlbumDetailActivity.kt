@@ -60,6 +60,12 @@ class AlbumDetailActivity : ComponentActivity() {
         val albumId = intent.getStringExtra("ALBUM_ID") ?: ""
         val albumName = intent.getStringExtra("ALBUM_NAME") ?: "Photos"
 
+        // Validate intent extras
+        if (albumId.isBlank() || albumId.length > 255 || albumName.length > 255) {
+            finish()
+            return
+        }
+
         setContent {
 
             EssentialMomentsTheme() {
