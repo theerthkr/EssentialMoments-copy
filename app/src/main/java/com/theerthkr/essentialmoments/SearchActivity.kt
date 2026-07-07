@@ -27,6 +27,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.LocalActivity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,7 +54,7 @@ class SearchActivity : ComponentActivity() {
 
 @Composable
 fun SearchScreen(searchViewModel: SearchViewModel = viewModel()) {
-    val context        = LocalContext.current as Activity
+    val context        = LocalActivity.current as Activity
     val focusRequester = remember { FocusRequester() }
 
     // Collect state
@@ -121,6 +122,24 @@ fun SearchScreen(searchViewModel: SearchViewModel = viewModel()) {
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+        }
+
+        // ── Smart Categories ───────────────────────────────────────
+        val smartCategories = listOf("Documents", "Pets", "Food", "Nature", "Receipts", "Cars")
+        androidx.compose.foundation.lazy.LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(smartCategories.size) { index ->
+                val category = smartCategories[index]
+                androidx.compose.material3.FilterChip(
+                    selected = query == category,
+                    onClick = { searchViewModel.onQueryChanged(category) },
+                    label = { Text(category) }
+                )
             }
         }
 
