@@ -130,6 +130,10 @@ class EmbeddingStore(context: Context) {
             .order(ByteOrder.LITTLE_ENDIAN)
             .asFloatBuffer()
 
+        val fb = ByteBuffer.wrap(raw)
+            .order(ByteOrder.LITTLE_ENDIAN)
+            .asFloatBuffer()
+
         RandomAccessFile(binFile, "r").use { raf ->
             for ((imageId, offset) in index) {
                 raf.seek(offset)
