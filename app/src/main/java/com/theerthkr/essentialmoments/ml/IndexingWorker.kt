@@ -129,8 +129,6 @@ class IndexingWorker(
                     }
                 }
 
-                store.flushIndex()
-
                 val totalDone = alreadyDone + indexed
                 setProgress(
                     Data.Builder()

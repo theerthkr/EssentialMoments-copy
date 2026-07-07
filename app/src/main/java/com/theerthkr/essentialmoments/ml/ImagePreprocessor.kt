@@ -138,6 +138,68 @@ class ImagePreprocessor(private val context: Context) {
     }
 
     // ─────────────────────────────────────────────────────────────
+    // Stage 3+4 – Normalise + pack as float32
+    // [Debug D3: pixel min/max] [Debug D4: array size]
+    // ─────────────────────────────────────────────────────────────
+
+    fun packFloat32Array(bitmap: Bitmap, debug: Boolean = false): FloatArray {
+        require(bitmap.width == INPUT_SIZE && bitmap.height == INPUT_SIZE) {
+            "Expected ${INPUT_SIZE}×${INPUT_SIZE}, got ${bitmap.width}×${bitmap.height}"
+        }
+
+        val pixels = IntArray(INPUT_SIZE * INPUT_SIZE)
+        bitmap.getPixels(pixels, 0, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE)
+
+        val arr = FloatArray(INPUT_SIZE * INPUT_SIZE * CHANNELS)
+        var arrIdx = 0
+
+        // Stats only computed in debug mode — no overhead in production
+        var minV =  Float.MAX_VALUE
+        var maxV = -Float.MAX_VALUE
+        var nanCount = 0
+
+        for (px in pixels) {
+            // SigLIP2 normalisation: (uint8 / 127.5) - 1.0  →  range [-1, 1]
+            val r = (px ushr 16 and 0xFF) / 127.5f - 1f
+            val g = (px ushr  8 and 0xFF) / 127.5f - 1f
+            val b = (px         and 0xFF) / 127.5f - 1f
+
+            arr[arrIdx++] = r
+            arr[arrIdx++] = g
+            arr[arrIdx++] = b
+
+            if (debug) {
+                minV = minOf(minV, r, g, b)
+                maxV = maxOf(maxV, r, g, b)
+                if (r.isNaN() || g.isNaN() || b.isNaN()) nanCount++
+            }
+        }
+
+        if (debug) {
+            // [D3] Pixel value range
+            Log.d(TAG, "[D3] pixel range: min=${"%.4f".format(minV)}  " +
+                    "max=${"%.4f".format(maxV)}  (expect ≈ [-1.0, 1.0])")
+            if (nanCount > 0) Log.e(TAG, "[D3] ❌ NaN detected: $nanCount values!")
+            else              Log.d(TAG, "[D3] ✅ no NaN values")
+
+            // [D4] Array size verification
+            val expectedSize = INPUT_SIZE * INPUT_SIZE * CHANNELS
+            Log.d(TAG, "[D4] array size: ${arr.size}  " +
+                    "(expected $expectedSize) " +
+                    if (arr.size == expectedSize) "✅" else "❌ MISMATCH")
+
+            // Spot-check: decode first pixel
+            val r0 = arr[0]
+            val g0 = arr[1]
+            val b0 = arr[2]
+            Log.d(TAG, "[D4] first pixel: " +
+                    "r=${"%.4f".format(r0)} g=${"%.4f".format(g0)} b=${"%.4f".format(b0)}")
+        }
+
+        return arr
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // Stage 3+4 – Normalise + pack as float16
     // [Debug D3: pixel min/max] [Debug D4: buffer byte count]
     // ─────────────────────────────────────────────────────────────

@@ -22,6 +22,9 @@ class TextEmbedder(private val context: Context) {
     }
 
     private var model: CompiledModel? = null
+    private var inputBuffers: List<com.google.ai.edge.litert.TensorBuffer>? = null
+    private var outputBuffers: List<com.google.ai.edge.litert.TensorBuffer>? = null
+
     private val tokenizer = SigLIPTokenizer(context)
 
     // ── Init ──────────────────────────────────────────────────────
@@ -32,8 +35,11 @@ class TextEmbedder(private val context: Context) {
 
         val accelerators = listOf(Accelerator.NPU, Accelerator.GPU, Accelerator.CPU)
         for (accel in accelerators) {
-            model = tryCreate(accel, debug)
-            if (model != null) {
+            val m = tryCreate(accel, debug)
+            if (m != null) {
+                model = m
+                inputBuffers = m.createInputBuffers()
+                outputBuffers = m.createOutputBuffers()
                 Log.d(TAG, "✅ TextEmbedder ready on $accel")
                 return
             }
@@ -62,6 +68,8 @@ class TextEmbedder(private val context: Context) {
      */
     fun embed(text: String, debug: Boolean = false): FloatArray? {
         val m = model ?: run { Log.e(TAG, "Not initialized"); return null }
+        val ib = inputBuffers ?: return null
+        val ob = outputBuffers ?: return null
 
         val tokenIds = tokenizer.tokenize(text)
 
@@ -70,28 +78,27 @@ class TextEmbedder(private val context: Context) {
             Log.d(TAG, "  token_ids[0..7]=${tokenIds.take(8).toIntArray().joinToString(",")}")
         }
 
-        return runInference(m, tokenIds, debug)
+        return runInference(m, ib, ob, tokenIds, debug)
     }
 
     // ── Inference ─────────────────────────────────────────────────
 
     private fun runInference(
         m: CompiledModel,
+        ib: List<com.google.ai.edge.litert.TensorBuffer>,
+        ob: List<com.google.ai.edge.litert.TensorBuffer>,
         tokenIds: IntArray,
         debug: Boolean
     ): FloatArray? {
         return try {
-            val inputBuffers  = m.createInputBuffers()
-            val outputBuffers = m.createOutputBuffers()
-
             // Text model takes int32 token IDs directly
-            inputBuffers[0].writeInt(tokenIds)
+            ib[0].writeInt(tokenIds)
 
             val t0 = System.currentTimeMillis()
-            m.run(inputBuffers, outputBuffers)
+            m.run(ib, ob)
             val ms = System.currentTimeMillis() - t0
 
-            val raw = outputBuffers[0].readFloat()
+            val raw = ob[0].readFloat()
 
             if (debug) {
                 Log.d(TAG, "  inference: ${ms}ms  dim=${raw.size}")
@@ -144,6 +151,8 @@ class TextEmbedder(private val context: Context) {
     // ── Lifecycle ─────────────────────────────────────────────────
 
     fun close() {
+        inputBuffers = null
+        outputBuffers = null
         model = null
         Log.d(TAG, "TextEmbedder closed")
     }

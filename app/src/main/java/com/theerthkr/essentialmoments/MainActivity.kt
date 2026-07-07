@@ -5,14 +5,12 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -191,6 +189,15 @@ class MainActivity : ComponentActivity() {
                                     val intent = Intent(context, ModelActivity::class.java)
                                     context.startActivity(intent)
                                     // Smooth transition matching your search bar
+                                    (context as? Activity)?.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN, 0, 0)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Storage Cleaner") },
+                                onClick = {
+                                    showMenu = false
+                                    val intent = Intent(context, CleanerActivity::class.java)
+                                    context.startActivity(intent)
                                     (context as? Activity)?.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN, 0, 0)
                                 }
                             )

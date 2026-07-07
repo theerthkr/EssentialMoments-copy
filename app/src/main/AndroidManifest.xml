@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -47,8 +47,14 @@
 
         <activity
             android:name=".AlbumDetailActivity"
-            android:exported="true"
+            android:exported="false"
             android:label="@string/title_activity_album_detail"
+            android:theme="@style/Theme.EssentialMoments" />
+
+        <activity
+            android:name=".CleanerActivity"
+            android:exported="false"
+            android:label="Storage Cleaner"
             android:theme="@style/Theme.EssentialMoments" />
 
         <activity

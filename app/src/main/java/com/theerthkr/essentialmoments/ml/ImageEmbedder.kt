@@ -135,7 +135,6 @@ class ImageEmbedder(
         Log.e(TAG, "Inference failed: ${e.message}", e); null
     }
 
-
     // ── Math ──────────────────────────────────────────────────────
 
     fun l2Norm(v: FloatArray) = sqrt(v.fold(0f) { a, x -> a + x * x })

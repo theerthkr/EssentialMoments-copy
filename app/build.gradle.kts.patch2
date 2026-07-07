@@ -1,0 +1,12 @@
+--- app/build.gradle.kts	2024-05-18 10:00:00.000000000 +0000
++++ app/build.gradle.kts	2024-05-18 10:00:00.000000000 +0000
+@@ -49,6 +49,9 @@
+         sourceCompatibility = JavaVersion.VERSION_11
+         targetCompatibility = JavaVersion.VERSION_11
+     }
++    testOptions {
++        unitTests.isReturnDefaultValues = true
++    }
+     buildFeatures {
+         compose = true
+     }
