@@ -7,6 +7,8 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.MappedByteBuffer
+import java.nio.channels.FileChannel
 
 /**
  * Flat-file embedding store — append-only binary file + JSON index.
@@ -40,8 +42,34 @@ class EmbeddingStore(context: Context) {
     // In-memory index: imageId → byte offset in bin file
     private val index = mutableMapOf<String, Long>()
 
+    // Class-level cached memory map to avoid native OOM on repeated searches
+    private var mappedBuffer: MappedByteBuffer? = null
+    private var mappedChannelRaf: RandomAccessFile? = null
+
     init {
         loadIndex()
+        refreshMappedBuffer()
+    }
+
+    @Synchronized
+    private fun refreshMappedBuffer() {
+        if (!binFile.exists() || binFile.length() == 0L) return
+
+        try {
+            mappedChannelRaf?.close()
+            mappedChannelRaf = RandomAccessFile(binFile, "r")
+            val channel = mappedChannelRaf!!.channel
+            // Note: MappedByteBuffer has a 2GB limit (Integer.MAX_VALUE)
+            val size = binFile.length()
+            if (size > Integer.MAX_VALUE) {
+                Log.e(TAG, "Embedding file exceeds 2GB MappedByteBuffer limit.")
+                return
+            }
+            mappedBuffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, size)
+            mappedBuffer?.order(ByteOrder.LITTLE_ENDIAN)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to map buffer: ${e.message}")
+        }
     }
 
     // ── Write ─────────────────────────────────────────────────────
@@ -85,6 +113,8 @@ class EmbeddingStore(context: Context) {
             index.forEach { (k, v) -> json.put(k, v) }
             idxFile.writeText(json.toString())
             Log.d(TAG, "Index flushed: ${index.size} entries")
+            // Refresh memory map when new batch has been flushed to disk
+            refreshMappedBuffer()
         } catch (e: Exception) {
             Log.e(TAG, "flushIndex failed: ${e.message}")
         }
@@ -121,33 +151,45 @@ class EmbeddingStore(context: Context) {
         }
         if (index.isEmpty()) return emptyList()
 
-        // Min-heap to keep the topK results. Smallest score is at the top.
-        val pq = java.util.PriorityQueue<SearchResult>(topK + 1) { a, b ->
-            a.score.compareTo(b.score)
-        }
-        val raw = ByteArray(BYTES_PER_EMBEDDING)
-        val fb = ByteBuffer.wrap(raw)
-            .order(ByteOrder.LITTLE_ENDIAN)
-            .asFloatBuffer()
+        val results = mutableListOf<SearchResult>()
 
-        val fb = ByteBuffer.wrap(raw)
-            .order(ByteOrder.LITTLE_ENDIAN)
-            .asFloatBuffer()
-
-        RandomAccessFile(binFile, "r").use { raf ->
-            for ((imageId, offset) in index) {
-                raf.seek(offset)
-                raf.readFully(raw)
-
-                // Dot product of two unit vectors = cosine similarity
-                var score = 0f
-                for (i in 0 until DIM) score += queryEmbedding[i] * fb.get(i)
-
-                pq.offer(SearchResult(imageId, score))
-                if (pq.size > topK) {
-                    pq.poll()
+        // Fallback to slower RAF if memory map failed or file > 2GB limit
+        val localBuffer = mappedBuffer
+        if (localBuffer == null) {
+            Log.w(TAG, "Search using fallback RAF because MappedByteBuffer is not initialized.")
+            val raw = ByteArray(BYTES_PER_EMBEDDING)
+            RandomAccessFile(binFile, "r").use { raf ->
+                for ((imageId, offset) in index) {
+                    raf.seek(offset)
+                    raf.readFully(raw)
+                    val fb = ByteBuffer.wrap(raw)
+                        .order(ByteOrder.LITTLE_ENDIAN)
+                        .asFloatBuffer()
+                    var score = 0f
+                    for (i in 0 until DIM) score += queryEmbedding[i] * fb.get(i)
+                    results.add(SearchResult(imageId, score))
                 }
             }
+            return results.sortedByDescending { it.score }.take(topK)
+        }
+
+        // Thread-safe iteration on the cached memory map
+        // We duplicate the buffer to have independent position/limit without copying data
+        val threadLocalBuffer = localBuffer.duplicate().apply {
+            order(ByteOrder.LITTLE_ENDIAN)
+        }
+
+        for ((imageId, offset) in index) {
+            // Note: offset.toInt() implies a 2GB limit for this store method.
+            threadLocalBuffer.position(offset.toInt())
+
+            var score = 0f
+            // Iterate using getFloat() directly to avoid creating a new FloatBuffer object
+            for (i in 0 until DIM) {
+                score += queryEmbedding[i] * threadLocalBuffer.getFloat()
+            }
+
+            results.add(SearchResult(imageId, score))
         }
 
         val results = mutableListOf<SearchResult>()
@@ -167,6 +209,9 @@ class EmbeddingStore(context: Context) {
     /** Wipes everything — useful when you want a clean re-index during debug */
     @Synchronized
     fun clearAll() {
+        mappedChannelRaf?.close()
+        mappedChannelRaf = null
+        mappedBuffer = null
         binFile.delete()
         idxFile.delete()
         index.clear()
