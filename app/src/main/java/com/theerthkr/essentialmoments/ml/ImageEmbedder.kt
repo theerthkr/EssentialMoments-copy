@@ -95,16 +95,16 @@ class ImageEmbedder(
         val m  = model         ?: run { Log.e(TAG, "Not initialized"); return null }
         val ib = inputBuffers  ?: return null
         val ob = outputBuffers ?: return null
-        val arr = preprocessor.preprocess(uri, debug) ?: return null
-        return runInference(m, ib, ob, arr, debug)
+        val buf = preprocessor.preprocess(uri, debug) ?: return null
+        return runInference(m, ib, ob, buf, debug)
     }
 
     fun embed(bitmap: Bitmap, debug: Boolean = false): FloatArray? {
         val m  = model         ?: run { Log.e(TAG, "Not initialized"); return null }
         val ib = inputBuffers  ?: return null
         val ob = outputBuffers ?: return null
-        val arr = preprocessor.preprocessBitmap(bitmap, debug)
-        return runInference(m, ib, ob, arr, debug)
+        val buf = preprocessor.preprocessBitmap(bitmap, debug)
+        return runInference(m, ib, ob, buf, debug)
     }
 
     // ── Inference — uses pre-allocated buffers ─────────────────────

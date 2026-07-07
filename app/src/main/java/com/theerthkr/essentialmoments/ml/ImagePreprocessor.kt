@@ -5,8 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+
 
 /**
  * Converts a device image URI into a ByteBuffer ready for SigLIP2 inference.
@@ -16,13 +15,13 @@ import java.nio.ByteOrder
  *   Dtype        : float16 (2 bytes per channel value)
  *   Pixel range  : [-1.0, 1.0]
  *   Normalisation: (pixel_uint8 / 127.5f) - 1.0f
- *   Buffer size  : 1 × 224 × 224 × 3 × 2 = 301,056 bytes
+ *   Array size   : 1 × 224 × 224 × 3 = 150,528 floats
  *
  * Debug checkpoints (enabled via debug=true):
  *   [D1] Bitmap W×H + null guard              → after load
  *   [D2] Cropped bitmap saved to external dir  → after centerCrop
  *   [D3] Pixel min/max                         → after packFloat16
- *   [D4] Buffer byte count                     → after packFloat16
+ *   [D4] Array float count                     → after packFloat16
  */
 class ImagePreprocessor(private val context: Context) {
 
@@ -31,7 +30,7 @@ class ImagePreprocessor(private val context: Context) {
         const val INPUT_SIZE   = 224
         const val CHANNELS     = 3
         // float16 = 2 bytes; total = 1 × 224 × 224 × 3 × 2
-        const val BUFFER_BYTES = INPUT_SIZE * INPUT_SIZE * CHANNELS * 2
+        const val ARRAY_SIZE = INPUT_SIZE * INPUT_SIZE * CHANNELS
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -53,7 +52,7 @@ class ImagePreprocessor(private val context: Context) {
      */
     fun preprocessBitmap(bitmap: Bitmap, debug: Boolean = false): FloatArray {
         val cropped = centerCrop(bitmap, debug)
-        val buf = packFloat32Array(cropped, debug)
+        val buf = packFloatArray(cropped, debug)
         // Only recycle if we made a new bitmap (centerCrop always creates one)
         if (cropped !== bitmap) cropped.recycle()
         return buf
@@ -205,7 +204,7 @@ class ImagePreprocessor(private val context: Context) {
     // [Debug D3: pixel min/max] [Debug D4: buffer byte count]
     // ─────────────────────────────────────────────────────────────
 
-    fun packFloat16(bitmap: Bitmap, debug: Boolean = false): ByteBuffer {
+    fun packFloatArray(bitmap: Bitmap, debug: Boolean = false): FloatArray {
         require(bitmap.width == INPUT_SIZE && bitmap.height == INPUT_SIZE) {
             "Expected ${INPUT_SIZE}×${INPUT_SIZE}, got ${bitmap.width}×${bitmap.height}"
         }
@@ -213,14 +212,13 @@ class ImagePreprocessor(private val context: Context) {
         val pixels = IntArray(INPUT_SIZE * INPUT_SIZE)
         bitmap.getPixels(pixels, 0, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE)
 
-        val buf = ByteBuffer
-            .allocateDirect(BUFFER_BYTES)
-            .order(ByteOrder.nativeOrder())
+        val buf = FloatArray(ARRAY_SIZE)
 
         // Stats only computed in debug mode — no overhead in production
         var minV =  Float.MAX_VALUE
         var maxV = -Float.MAX_VALUE
         var nanCount = 0
+        var idx = 0
 
         for (px in pixels) {
             // SigLIP2 normalisation: (uint8 / 127.5) - 1.0  →  range [-1, 1]
@@ -228,9 +226,9 @@ class ImagePreprocessor(private val context: Context) {
             val g = (px ushr  8 and 0xFF) / 127.5f - 1f
             val b = (px         and 0xFF) / 127.5f - 1f
 
-            buf.putShort(f32ToF16(r))
-            buf.putShort(f32ToF16(g))
-            buf.putShort(f32ToF16(b))
+            buf[idx++] = r
+            buf[idx++] = g
+            buf[idx++] = b
 
             if (debug) {
                 minV = minOf(minV, r, g, b)
@@ -239,7 +237,7 @@ class ImagePreprocessor(private val context: Context) {
             }
         }
 
-        buf.rewind()
+
 
         if (debug) {
             // [D3] Pixel value range
@@ -249,53 +247,20 @@ class ImagePreprocessor(private val context: Context) {
             else              Log.d(TAG, "[D3] ✅ no NaN values")
 
             // [D4] Buffer size verification
-            val expectedBytes = BUFFER_BYTES
-            Log.d(TAG, "[D4] buffer size: ${buf.capacity()} bytes  " +
-                    "(expected $expectedBytes) " +
-                    if (buf.capacity() == expectedBytes) "✅" else "❌ MISMATCH")
+            val expectedFloats = ARRAY_SIZE
+            Log.d(TAG, "[D4] array size: ${buf.size} floats  " +
+                    "(expected $expectedFloats) " +
+                    if (buf.size == expectedFloats) "✅" else "❌ MISMATCH")
 
-            // Spot-check: decode first pixel back from f16 to verify round-trip
-            buf.rewind()
-            val r0 = f16ToF32(buf.short)
-            val g0 = f16ToF32(buf.short)
-            val b0 = f16ToF32(buf.short)
-            buf.rewind()
-            Log.d(TAG, "[D4] first pixel after f16 encode/decode: " +
+            // Spot-check: decode first pixel to verify
+            val r0 = buf[0]
+            val g0 = buf[1]
+            val b0 = buf[2]
+            Log.d(TAG, "[D4] first pixel check: " +
                     "r=${"%.4f".format(r0)} g=${"%.4f".format(g0)} b=${"%.4f".format(b0)}")
         }
 
         return buf
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // IEEE 754  float32 → float16
-    // ─────────────────────────────────────────────────────────────
-
-    fun f32ToF16(v: Float): Short {
-        val b = java.lang.Float.floatToRawIntBits(v)
-        val sign  = (b ushr 31) and 0x1
-        val exp32 = (b ushr 23) and 0xFF
-        val frac  =  b          and 0x7FFFFF
-        val exp16 = exp32 - 127 + 15
-        return when {
-            exp16 <= 0  -> (sign shl 15).toShort()
-            exp16 >= 31 -> ((sign shl 15) or 0x7C00).toShort()
-            else        -> ((sign shl 15) or (exp16 shl 10) or (frac ushr 13)).toShort()
-        }
-    }
-
-    // IEEE 754  float16 → float32  (used in D4 spot-check and by ImageEmbedder)
-    fun f16ToF32(h: Short): Float {
-        val hBits = h.toInt() and 0xFFFF
-        val sign  = (hBits shr 15) and 0x1
-        val exp   = (hBits shr 10) and 0x1F
-        val frac  =  hBits         and 0x3FF
-        val f32Bits = when {
-            exp == 0  -> (sign shl 31) or (frac shl 13)           // subnormal / zero
-            exp == 31 -> (sign shl 31) or 0x7F800000 or (frac shl 13)  // inf / NaN
-            else      -> (sign shl 31) or ((exp - 15 + 127) shl 23) or (frac shl 13)
-        }
-        return java.lang.Float.intBitsToFloat(f32Bits)
     }
 
     // ─────────────────────────────────────────────────────────────
