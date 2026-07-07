@@ -139,7 +139,7 @@ class ModelActivity : ComponentActivity() {
             "Success! Embedding Size: ${finalImageEmbedding.size}\n\nFirst 10 values:\n$preview"
 
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("ModelActivity", "Error during image inference", e)
             "Error: ${e.localizedMessage}"
         }
     }
@@ -160,7 +160,7 @@ class ModelActivity : ComponentActivity() {
             "Success! Embedding Dim: ${finalTextEmbedding.size}\nPrompt: \"$searchQuery\"\nFirst 5 values: $preview"
 
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("ModelActivity", "Error during text inference", e)
             "Error: ${e.localizedMessage}"
         }
     }
@@ -208,8 +208,7 @@ class ModelActivity : ComponentActivity() {
             }
             Log.d("ModelActivity", "Debug image saved successfully to: ${file.absolutePath}")
         } catch (e: Exception) {
-            e.printStackTrace()
-            Log.e("ModelActivity", "Failed to save debug image: ${e.message}")
+            Log.e("ModelActivity", "Failed to save debug image", e)
         }
     }
 }
