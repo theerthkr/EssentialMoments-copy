@@ -103,7 +103,7 @@ class ImageEmbedder(
         val ib = inputBuffers  ?: return null
         val ob = outputBuffers ?: return null
         val buf = preprocessor.preprocess(uri, debug) ?: return null
-        return runInference(m, ib, ob, bufferToFloat32(buf), debug)
+        return runInference(m, ib, ob, buf, debug)
     }
 
     fun embed(bitmap: Bitmap, debug: Boolean = false): FloatArray? {
@@ -111,7 +111,7 @@ class ImageEmbedder(
         val ib = inputBuffers  ?: return null
         val ob = outputBuffers ?: return null
         val buf = preprocessor.preprocessBitmap(bitmap, debug)
-        return runInference(m, ib, ob, bufferToFloat32(buf), debug)
+        return runInference(m, ib, ob, buf, debug)
     }
 
     // ── Inference — uses pre-allocated buffers ─────────────────────

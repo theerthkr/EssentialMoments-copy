@@ -4,12 +4,17 @@ import android.content.Context
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer
 import com.google.ai.edge.litert.Accelerator
 import com.google.ai.edge.litert.CompiledModel
+import com.google.ai.edge.litert.TensorBuffer
 import kotlin.math.sqrt
 
 class SiglipTextProcessor(context: Context) {
 
     private val tokenizer: HuggingFaceTokenizer
     private val model: CompiledModel
+
+    // Cached buffers for inference performance
+    private val inputBuffers: List<TensorBuffer>
+    private val outputBuffers: List<TensorBuffer>
 
     // TFLite Text Model constraints
     private val maxLength = 64
@@ -27,6 +32,10 @@ class SiglipTextProcessor(context: Context) {
             "siglip2_text.tflite",
             CompiledModel.Options(Accelerator.NPU) // Fallback to CPU happens automatically if NPU fails
         )
+
+        // 3. Cache buffers to avoid reallocation during inference
+        inputBuffers = model.createInputBuffers()
+        outputBuffers = model.createOutputBuffers()
     }
 
     /**
@@ -66,10 +75,7 @@ class SiglipTextProcessor(context: Context) {
      * Feeds the [64] IntArray into LiteRT and extracts the [768] FloatArray
      */
     private fun runInference(inputArray: IntArray): FloatArray {
-        val inputBuffers = model.createInputBuffers()
-        val outputBuffers = model.createOutputBuffers()
-
-        // Write the [64] tokens into the model
+        // Write the [64] tokens into the cached model buffers
         inputBuffers[0].writeInt(inputArray)
 
         // Execute math
